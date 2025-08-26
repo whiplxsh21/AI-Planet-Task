@@ -1,0 +1,1 @@
+# initialise slide_generator as a submodule

@@ -27,7 +27,7 @@ SLIDES_SCHEMA = {
                     "additionalProperties": True,
                 }
             ] + [
-                {  # Slides 2-7 (key slides)
+                {  # Slides 2-7 
                     "type": "object",
                     "properties": {
                         "title": {"type": "string"},
@@ -63,14 +63,12 @@ def validate_slides_json(data: dict) -> bool:
 def repair_slides_json(data: dict) -> dict:
     slides = data.get("slides", [])
 
-    # Truncate extra slides
     if len(slides) > 7:
         slides = slides[:7]
 
-    # If fewer than 7, append placeholder slides
+
     while len(slides) < 7:
         slide_num = len(slides) + 1
-        # For last slide, add "Conclusion" placeholder slide
         if slide_num == 7:
             slides.append({
                 "title": "Conclusion",
@@ -82,13 +80,12 @@ def repair_slides_json(data: dict) -> dict:
                 "bullets": ["Content not provided"]
             })
 
-    # If last slide is missing "Conclusion" title, fix it
     if slides[6].get("title", "").lower() not in ["conclusion", "takeaways"]:
         slides[6]["title"] = "Conclusion"
         if not slides[6].get("bullets"):
             slides[6]["bullets"] = ["Content not provided"]
 
-    # Fix titles and bullets on all slides
+
     for i, slide in enumerate(slides):
         if "title" not in slide or not isinstance(slide["title"], str) or not slide["title"].strip():
             slide["title"] = f"Slide {i + 1}"
@@ -111,9 +108,9 @@ def safe_validate_and_repair(data: dict) -> dict:
     and return a guaranteed valid JSON as per your schema.
     """
     try:
-        # Validate against JSON schema
+
         validate(instance=data, schema=SLIDES_SCHEMA)
-        # Additional checks that bullets are present in slides 2-7
+
         if validate_slides_json(data):
             return data
         else:

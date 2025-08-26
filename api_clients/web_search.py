@@ -18,8 +18,7 @@ def search_tavily(topic, max_results=8):
                           
 
 def search_duckduckgo(topic, max_results=8):
-    # Free DuckDuckGo Instant Answer API returns only one snippet; for better, use scraping libraries or third-party APIs.
-    # Here, a minimal fallback with one item.
+    # kinda shitty API honestly but decent for a fallback. SERPAPI has rate limits of 150 req/day I think.
     try:
         resp = requests.get("https://api.duckduckgo.com/",
                             params={"q": topic, "format": "json", "no_redirect": 1, "skip_disambig": 1}, timeout=8)

@@ -21,7 +21,7 @@ def main():
 
     topic = input("Enter a topic for your presentation: ").strip()
 
-    # Fetch and download image for the title slide
+
     image_url = search_unsplash_image(topic)
     image_path = None
     if image_url:
@@ -29,23 +29,23 @@ def main():
         image_path = f"output/title_image.jpg"
         download_image(image_url, image_path)
 
-    # Web search and LLM slide content generation
+
     snippets = search_web(topic)
     slides_json = generate_slide_content(topic, snippets)
 
-    # Defensive check if generation failed
+
     if slides_json is None:
         console.print("[red]Failed to generate slide content. Exiting.[/red]")
         return
 
-    # Validate and repair slide JSON to match schema
+
     slides_json = safe_validate_and_repair(slides_json)
 
-    # Prepare output file path
+
     safe_topic = topic.replace(" ", "_")
     output_file = f"output/{safe_topic}.pptx"
 
-    # Create and save the PowerPoint presentation with chosen style and image
+
     create_presentation(slides_json, output_file, chosen_style, title_image_path=image_path)
 
     console.print(f"[green]Slide deck saved: {output_file}[/green]")

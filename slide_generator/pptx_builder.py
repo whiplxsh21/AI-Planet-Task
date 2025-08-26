@@ -17,17 +17,17 @@ def get_style_dict():
 def create_presentation(slides_json, output_file, style_name="blue", title_image_path=None):
     style = get_style_dict().get(style_name, get_style_dict()["blue"])
     prs = Presentation()
+    # this is the first time I'm working with this module, getting stuff aligned is very hard honestly. especially with images.
 
-    # Use a BLANK layout for the first slide so we fully control title rendering.
-    blank_layout = prs.slide_layouts[6]      # typically "Blank"
-    content_slide_layout = prs.slide_layouts[1]  # keep others unchanged
+    blank_layout = prs.slide_layouts[6]      
+    content_slide_layout = prs.slide_layouts[1]  
 
     for i, slide in enumerate(slides_json.get("slides", [])):
         if i == 0:
-            # First (title) slide on a blank layout
+            # first (title) slide on a blank layout
             sldr = prs.slides.add_slide(blank_layout)
 
-            # Add a centered title textbox (reliable across themes/viewers)
+            # add centered title textbox 
             title_left   = int(prs.slide_width  * 0.10)
             title_width  = int(prs.slide_width  * 0.80)
             title_top    = int(prs.slide_height * 0.08)
@@ -46,17 +46,17 @@ def create_presentation(slides_json, output_file, style_name="blue", title_image
                 run.font.name = style["font"]
                 run.font.color.rgb = style["color"]
 
-            # Add image below the title, centered
+            # add image below the title, centered
             if title_image_path and os.path.exists(title_image_path):
                 img = Image.open(title_image_path)
                 img_width, img_height = img.size
                 dpi = img.info.get("dpi", (96, 96))[0]  # fallback if missing
 
-                # Convert pixel size -> EMUs
+                # convet pixel size -> EMUs
                 img_width_emu = Inches(img_width / dpi)
                 img_height_emu = Inches(img_height / dpi)
 
-                # Scale to fit reserved area
+                # scale to fit reserved area
                 max_width = prs.slide_width * 0.60
                 max_height = prs.slide_height * 0.44
                 scale = min(max_width / img_width_emu, max_height / img_height_emu, 1)
@@ -76,7 +76,7 @@ def create_presentation(slides_json, output_file, style_name="blue", title_image
                 )
 
         else:
-            # Other slides unchanged
+            # slides 2-7
             sldr = prs.slides.add_slide(content_slide_layout)
             sldr.shapes.title.text = slide.get("title", "")
 

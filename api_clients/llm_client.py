@@ -93,11 +93,9 @@ def generate_slide_content(topic: str, snippets: list) -> dict | None:
         resp.raise_for_status()
         content = resp.json()["choices"][0]["message"]["content"].strip()
         print("LLM raw response content:\n", content)
-        # Attempt to parse JSON; fall back to repair if needed
         try:
             slide_json = json.loads(content)
         except Exception:
-            # Try extracting JSON substring
             import re
             json_texts = re.findall(r"{[\s\S]*}", content)
             if json_texts:
