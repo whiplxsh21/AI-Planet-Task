@@ -1,55 +1,54 @@
-import os
 from dotenv import load_dotenv
-from api_clients.web_search import search_web
-from api_clients.llm_client import generate_slide_content
-from slide_generator.pptx_builder import create_presentation
-from utils.validation import validate_slides_json
-from rich.prompt import Prompt
-from rich.console import Console
-
-import sys
-
-print("Current working directory:", os.getcwd())
-print("sys.path:", sys.path)
-
-
 load_dotenv()
-console = Console()
 
-
-print("TAVILY_API_KEY:", os.getenv("TAVILY_API_KEY"))
-print("OPENROUTER_API_KEY:", os.getenv("OPENROUTER_API_KEY"))
+import os
+from rich.console import Console
+from api_clients.web_search import search_web
+from api_clients.image_search import search_unsplash_image, download_image
+from api_clients.llm_client import generate_slide_content
+from utils.validation import safe_validate_and_repair
+from slide_generator.pptx_builder import create_presentation, get_style_dict
 
 def main():
-    console.print("[bold blue]Welcome to Auto Slide Deck Generator[/bold blue]")
-    topic = Prompt.ask("Enter a topic for your presentation")
-    console.print(f"[green]Searching the web for latest info on:[/green] {topic}")
+    console = Console()
+    styles = get_style_dict()
+    console.print("[bold]Available styles:[/bold]")
+    for k in styles:
+        console.print(f"- {k}")
+    chosen_style = input("Choose a style: ").strip().lower()
+    if chosen_style not in styles:
+        chosen_style = "blue"
 
+    topic = input("Enter a topic for your presentation: ").strip()
+
+    # Fetch and download image for the title slide
+    image_url = search_unsplash_image(topic)
+    image_path = None
+    if image_url:
+        os.makedirs("output", exist_ok=True)
+        image_path = f"output/title_image.jpg"
+        download_image(image_url, image_path)
+
+    # Web search and LLM slide content generation
     snippets = search_web(topic)
-    if not snippets:
-        console.print("[red]No search results found. Exiting.[/red]")
-        return
-
-    console.print(f"[green]Generating slide content using LLM...[/green]")
     slides_json = generate_slide_content(topic, snippets)
 
-    if not slides_json:
-        console.print("[red]Failed to generate slide content or invalid format returned.[/red]")
+    # Defensive check if generation failed
+    if slides_json is None:
+        console.print("[red]Failed to generate slide content. Exiting.[/red]")
         return
 
-    valid = validate_slides_json(slides_json)
-    if not valid:
-        console.print("[red]Generated slide content JSON did not pass validation.[/red]")
-        return
+    # Validate and repair slide JSON to match schema
+    slides_json = safe_validate_and_repair(slides_json)
 
-    output_dir = "output"
-    os.makedirs(output_dir, exist_ok=True)
-    filename = f"{topic.replace(' ', '_')}.pptx"
-    output_path = os.path.join(output_dir, filename)
+    # Prepare output file path
+    safe_topic = topic.replace(" ", "_")
+    output_file = f"output/{safe_topic}.pptx"
 
-    create_presentation(slides_json, output_path)
-    console.print(f"[bold green]Slide deck created successfully at:[/bold green] {output_path}")
+    # Create and save the PowerPoint presentation with chosen style and image
+    create_presentation(slides_json, output_file, chosen_style, title_image_path=image_path)
 
+    console.print(f"[green]Slide deck saved: {output_file}[/green]")
 
 if __name__ == "__main__":
     main()
