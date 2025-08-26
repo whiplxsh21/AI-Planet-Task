@@ -1,5 +1,8 @@
 import jsonschema
-from jsonschema import validate
+from jsonschema import validate, ValidationError
+from rich.console import Console
+
+console = Console()
 
 SLIDES_SCHEMA = {
     "type": "object",
@@ -59,30 +62,58 @@ def validate_slides_json(data: dict) -> bool:
 
 def repair_slides_json(data: dict) -> dict:
     slides = data.get("slides", [])
+
+    # Truncate extra slides
     if len(slides) > 7:
         slides = slides[:7]
+
+    # If fewer than 7, append placeholder slides
     while len(slides) < 7:
-        slides.append({
-            "title": f"Slide {len(slides) + 1}",
-            "bullets": ["Content not provided"]
-        })
+        slide_num = len(slides) + 1
+        # For last slide, add "Conclusion" placeholder slide
+        if slide_num == 7:
+            slides.append({
+                "title": "Conclusion",
+                "bullets": ["Content not provided"]
+            })
+        else:
+            slides.append({
+                "title": f"Slide {slide_num}",
+                "bullets": ["Content not provided"]
+            })
+
+    # If last slide is missing "Conclusion" title, fix it
+    if slides[6].get("title", "").lower() not in ["conclusion", "takeaways"]:
+        slides[6]["title"] = "Conclusion"
+        if not slides[6].get("bullets"):
+            slides[6]["bullets"] = ["Content not provided"]
+
+    # Fix titles and bullets on all slides
     for i, slide in enumerate(slides):
         if "title" not in slide or not isinstance(slide["title"], str) or not slide["title"].strip():
             slide["title"] = f"Slide {i + 1}"
         bullets = slide.get("bullets")
-        if i == 0 and bullets is None:
-            slide["bullets"] = ["Introduction to the topic."]
-        elif i > 0 and (not isinstance(bullets, list) or len(bullets) == 0):
-            slide["bullets"] = ["Content not provided"]
+        if i == 0:
+            if bullets is None:
+                slide["bullets"] = ["Introduction to the topic."]
+        else:
+            if not isinstance(bullets, list) or len(bullets) == 0:
+                slide["bullets"] = ["Content not provided"]
+
     data["slides"] = slides
     return data
 
+
+
 def safe_validate_and_repair(data: dict) -> dict:
-    # Try to validate and repair as needed
-    from rich.console import Console
-    console = Console()
+    """
+    Validate slides JSON using jsonschema. If invalid or missing bullets, repair
+    and return a guaranteed valid JSON as per your schema.
+    """
     try:
+        # Validate against JSON schema
         validate(instance=data, schema=SLIDES_SCHEMA)
+        # Additional checks that bullets are present in slides 2-7
         if validate_slides_json(data):
             return data
         else:
@@ -90,8 +121,8 @@ def safe_validate_and_repair(data: dict) -> dict:
             repaired = repair_slides_json(data)
             assert validate_slides_json(repaired)
             return repaired
-    except jsonschema.ValidationError:
-        console.print("[yellow]JSON schema validation failed; repairing slides data...[/yellow]")
+    except ValidationError as e:
+        console.print(f"[yellow]JSON schema validation failed; repairing slides data...[/yellow]")
         repaired = repair_slides_json(data)
         validate(instance=repaired, schema=SLIDES_SCHEMA)
         assert validate_slides_json(repaired)

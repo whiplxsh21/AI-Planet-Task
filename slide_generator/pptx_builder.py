@@ -1,50 +1,100 @@
 from pptx import Presentation
-from pptx.util import Pt
+from pptx.util import Pt, Inches
 from pptx.dml.color import RGBColor
-from pptx.enum.text import PP_ALIGN
+from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
 import os
+from PIL import Image
+
 
 def get_style_dict():
     return {
         "blue":  {"color": RGBColor(54, 95, 145), "font": "Calibri"},
         "green": {"color": RGBColor(34, 177, 76), "font": "Arial"},
-        "orange": {"color": RGBColor(237, 125, 49), "font": "Tahoma"}
+        "orange": {"color": RGBColor(237, 125, 49), "font": "Tahoma"},
     }
+
 
 def create_presentation(slides_json, output_file, style_name="blue", title_image_path=None):
     style = get_style_dict().get(style_name, get_style_dict()["blue"])
     prs = Presentation()
-    title_slide_layout = prs.slide_layouts[0]
-    content_slide_layout = prs.slide_layouts[1]
+
+    # Use a BLANK layout for the first slide so we fully control title rendering.
+    blank_layout = prs.slide_layouts[6]      # typically "Blank"
+    content_slide_layout = prs.slide_layouts[1]  # keep others unchanged
 
     for i, slide in enumerate(slides_json.get("slides", [])):
         if i == 0:
-            sldr = prs.slides.add_slide(title_slide_layout)
-            sldr.shapes.title.text = slide.get("title", "")
-            title_shape = sldr.shapes.title
+            # First (title) slide on a blank layout
+            sldr = prs.slides.add_slide(blank_layout)
 
-            # Add image under title if provided
+            # Add a centered title textbox (reliable across themes/viewers)
+            title_left   = int(prs.slide_width  * 0.10)
+            title_width  = int(prs.slide_width  * 0.80)
+            title_top    = int(prs.slide_height * 0.08)
+            title_height = int(prs.slide_height * 0.18)
+
+            title_box = sldr.shapes.add_textbox(title_left, title_top, title_width, title_height)
+            tf = title_box.text_frame
+            tf.clear()
+            tf.vertical_anchor = MSO_ANCHOR.MIDDLE
+
+            p = tf.paragraphs[0]
+            p.text = slide.get("title", "")
+            p.alignment = PP_ALIGN.CENTER
+            for run in p.runs:
+                run.font.size = Pt(44)
+                run.font.name = style["font"]
+                run.font.color.rgb = style["color"]
+
+            # Add image below the title, centered
             if title_image_path and os.path.exists(title_image_path):
-                left = title_shape.left
-                top = title_shape.top + title_shape.height + Pt(20)
-                width = Pt(400)
-                height = Pt(250)
-                sldr.shapes.add_picture(title_image_path, left, top, width, height)
+                img = Image.open(title_image_path)
+                img_width, img_height = img.size
+                dpi = img.info.get("dpi", (96, 96))[0]  # fallback if missing
+
+                # Convert pixel size -> EMUs
+                img_width_emu = Inches(img_width / dpi)
+                img_height_emu = Inches(img_height / dpi)
+
+                # Scale to fit reserved area
+                max_width = prs.slide_width * 0.60
+                max_height = prs.slide_height * 0.44
+                scale = min(max_width / img_width_emu, max_height / img_height_emu, 1)
+
+                pic_width = int(img_width_emu * scale)
+                pic_height = int(img_height_emu * scale)
+
+                left = int((prs.slide_width - pic_width) / 2)
+                top = int(title_top + title_height + Pt(16))  # small gap below title
+
+                sldr.shapes.add_picture(
+                    title_image_path,
+                    left,
+                    top,
+                    width=pic_width,
+                    height=pic_height,
+                )
+
         else:
+            # Other slides unchanged
             sldr = prs.slides.add_slide(content_slide_layout)
             sldr.shapes.title.text = slide.get("title", "")
+
             content_placeholder = None
             for shape in sldr.shapes:
                 if shape.is_placeholder and shape.has_text_frame and shape != sldr.shapes.title:
                     content_placeholder = shape
                     break
+
             if content_placeholder:
                 tf = content_placeholder.text_frame
                 tf.clear()
                 for bullet in slide.get("bullets", []):
-                    p = tf.add_paragraph()
-                    p.text = bullet
-                    p.font.size = Pt(18)
-                    p.font.name = style["font"]
-                    p.font.color.rgb = style["color"]
+                    if bullet.strip():
+                        p = tf.add_paragraph()
+                        p.text = bullet
+                        p.font.size = Pt(18)
+                        p.font.name = style["font"]
+                        p.font.color.rgb = style["color"]
+
     prs.save(output_file)
